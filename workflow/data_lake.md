@@ -5,3 +5,9 @@ The phrase Extract Transform Load explains most of the philosiphy behind it. It 
 - ELT provides data lake support(Schema on read)
 - Data Lake is the solution to the ELT and Data Warehouse is the solution to the ETL problem
 ![alt text](etlpipelines.png)
+
+
+![alt text](image.png)
+
+## Data Pipeline Architecture
+A data pipeline architecture is the design and implementation of the code and systems that copy, cleanse, transform, and route data from data source systems to destination systems.

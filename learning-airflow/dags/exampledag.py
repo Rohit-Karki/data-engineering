@@ -1,6 +1,5 @@
 import os
 from airflow import Dataset, DAG
-from airflow.decorators import dag, task
 from pendulum import datetime
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
@@ -23,12 +22,12 @@ dag = DAG(
     'file_processing_workflow',
     default_args=default_args,
     description='Monitor folder for files and process them',
-    schedule_interval=timedelta(minutes=5),  # Check every 5 minutes
+    schedule_interval=timedelta(minutes=1),  # Check every 1 minutes
     catchup=False,
 )
 
 # Define the path to monitor
-folder_path='/usr/local/airflow'  # inside Docker
+folder_path='/usr/local/airflow/tests'  # inside Docker
 
 def check_directory(**kwargs):
     import os
@@ -43,21 +42,6 @@ check_dir_task = PythonOperator(
     dag=dag
 )
 
-# Function to process the file
-def process_file(**context):
-    file_path = context['ti'].xcom_pull(task_ids='wait_for_file', key='file_path')
-    print(f"Processing file: {file_path}")
-    
-    # Your processing logic here
-    
-    # Optionally, move the file to a 'processed' folder
-    processed_dir = os.path.join(os.path.dirname(file_path), 'processed')
-    os.makedirs(processed_dir, exist_ok=True)
-    new_path = os.path.join(processed_dir, os.path.basename(file_path))
-    os.rename(file_path, new_path)
-    
-    return f"Processed and moved file to {new_path}"
-
 # Set up the FileSensor to wait for a file
 wait_for_file = LocalFileSensor(
     task_id='wait_for_file',
@@ -70,16 +54,9 @@ wait_for_file = LocalFileSensor(
 )
 
 
-# # Set up the processing task
-# process_task = PythonOperator(
-#     task_id='process_file',
-#     python_callable=process_file,
-#     provide_context=True,
-#     dag=dag,
-# )
-
 # Set up the processing task
 process_task = ZipOperator(
+    task_id='process_task',
     dag=dag
 )
 

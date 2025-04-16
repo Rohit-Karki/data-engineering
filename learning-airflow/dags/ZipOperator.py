@@ -3,8 +3,8 @@ import os
 import tempfile
 import logging
 from zipfile import ZipFile
-from airflow.models import BaseOperator
-from airflow.utils import apply_defaults
+from airflow.models.baseoperator import BaseOperator
+from airflow.utils.decorators import apply_defaults
 
 
 class ZipOperator(BaseOperator):
@@ -31,12 +31,12 @@ class ZipOperator(BaseOperator):
 
     def execute(self, context):
         logging.info("Executing ZipOperator.execute(context)")        
-        print(f"Processing file: {file_path}")       
 
         # Get the path from XCom if not provided
         if not self.path_to_file_to_zip:
             self.path_to_file_to_zip = context['ti'].xcom_pull(task_ids='wait_for_file', key='file_path')
             
+        print(f"Processing file: {self.path_to_file_to_zip}")
 
         # Generate zip path if not provided
         if not self.path_to_save_zip:
