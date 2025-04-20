@@ -1,0 +1,37 @@
+version: "3.8"
+networks:
+  airflow_network:
+    external: true
+    name: learning-airflow_171396_airflow
+services:
+  flaskapp:
+    container_name: flaskapp
+    build:
+      context: .
+    ports:
+      - "35000:5000"
+    depends_on:
+      - minio
+    environment:
+      FLASK_ENV: development
+    volumes:
+      - ./app:/app  # Bind mount the FlaskApp directory
+
+
+  minio:
+    container_name: minio
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "39000:9000"
+      - "39001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    networks:
+      - airflow_network     
+    volumes:
+      - minio_data:/data
+
+volumes:
+  minio_data:
