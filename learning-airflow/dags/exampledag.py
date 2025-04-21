@@ -1,9 +1,10 @@
-from minio import Minio
 import os
 from airflow import Dataset, DAG
 from pendulum import datetime
 from airflow.operators.python import PythonOperator
 from airflow.operators.email import EmailOperator
+from minio import Minio
+from minio.error import S3Error
 from datetime import datetime, timedelta
 from LocalFileSensor import LocalFileSensor
 from ZipOperator import ZipOperator
@@ -27,7 +28,6 @@ dag = DAG(
     # schedule_interval=timedelta(minutes=1),  # Check every 1 minutes
     catchup=False,
 )
-
 
 def check_fileName_in_minio(**kwargs):
     folder_path = '/usr/local/airflow/files'
@@ -60,8 +60,29 @@ def check_fileName_in_minio(**kwargs):
 
     return local_file_path
 
+def upload_zip_to_minio(**context):
+    local_zip_path = context['ti'].xcom_pull(task_ids='process_task', key='zip_file_path')
+    print(f"{local_zip_path}")
+    minio_client = Minio(
+        "minio:9000",
+        access_key="minio",
+        secret_key="minio123",
+        secure=False
+    )
 
-    # return files
+    bucket_name = "processed-files"
+    object_name = local_zip_path.split("/")[-1]  # just the file name
+
+    # Ensure bucket and upload
+    if not minio_client.bucket_exists(bucket_name):
+        minio_client.make_bucket(bucket_name)
+
+    minio_client.fput_object(bucket_name, object_name, local_zip_path)
+
+    # Optionally push to XCom
+    context['ti'].xcom_push(key='zipped_file_url', value=f"s3://{bucket_name}/{object_name}")
+    print(f"s3://{bucket_name}/{object_name}")
+
 
 check_dir_task = PythonOperator(
     task_id='check_directory',
@@ -75,17 +96,24 @@ process_task = ZipOperator(
     dag=dag
 )
 
-send_email = EmailOperator(
-    task_id='send_email',
-    to='rohitkarki804@gmail.com',
-    subject='Zipped and Unzipped File Paths',
-    html_content="""
-    <h3>Files Processed Successfully</h3>
-    <p><strong>Unzipped File Path:</strong> {{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}</p>
-    <p><strong>Zipped File Path:</strong> {{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}</p>
-    """,
+# Upload the zipped file to Minio
+upload_to_minio = PythonOperator(
+    task_id='upload_to_minio',
+    python_callable=upload_zip_to_minio,
     dag=dag
 )
 
+# send_email = EmailOperator(
+#     task_id='send_email',
+#     to='rohitkarki804@gmail.com',
+#     subject='Zipped and Unzipped File Paths',
+#     html_content="""
+#     <h3>Files Processed Successfully</h3>
+#     <p><strong>Unzipped File Path:</strong> {{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}</p>
+#     <p><strong>Zipped File Path:</strong> {{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}</p>
+#     """,
+#     dag=dag
+# )
+
 # Define task dependencies
-check_dir_task >> process_task
+check_dir_task >> process_task >> upload_to_minio
