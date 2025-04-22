@@ -30,12 +30,13 @@ class ZipOperator(BaseOperator):
         self.path_to_save_zip = path_to_save_zip
 
     def execute(self, context):
-        logging.info("Executing ZipOperator.execute(context)")        
+        logging.info("Executing ZipOperator.execute(context)")
 
         # Get the path from XCom if not provided
         if not self.path_to_file_to_zip:
-            self.path_to_file_to_zip = context['ti'].xcom_pull(task_ids='wait_for_file', key='file_path')
-            
+            self.path_to_file_to_zip = context['ti'].xcom_pull(
+                task_ids='wait_for_file', key='file_path')
+
         print(f"Processing file: {self.path_to_file_to_zip}")
 
         # Generate zip path if not provided
@@ -43,9 +44,9 @@ class ZipOperator(BaseOperator):
             folder_path = os.path.dirname(self.path_to_file_to_zip)
             file_name = os.path.basename(self.path_to_file_to_zip)
             base_name = os.path.splitext(file_name)[0]
-            self.path_to_save_zip = os.path.join(folder_path, f"{base_name}.zip")
-        
-        
+            self.path_to_save_zip = os.path.join(
+                folder_path, f"{base_name}.zip")
+
         logging.info(f"Path to the File to Zip: {self.path_to_file_to_zip}")
         logging.info(f"Path to save the Zip File: {self.path_to_save_zip}")
 

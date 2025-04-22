@@ -19,7 +19,7 @@ default_args = {
 
 # Define the DAG
 dag = DAG(
-    'file_processing_workflow',
+    'file_compression_and_email_workflow',
     default_args=default_args,
     description='Monitor folder for files and process them',
     schedule_interval=timedelta(minutes=1),  # Check every 1 minutes
@@ -27,7 +27,8 @@ dag = DAG(
 )
 
 # Define the path to monitor
-folder_path='/usr/local/airflow/tests'  # inside Docker
+folder_path = '/usr/local/airflow/tests'  # inside Docker
+
 
 def check_directory(**kwargs):
     import os
@@ -35,6 +36,7 @@ def check_directory(**kwargs):
     files = os.listdir(directory)
     print(f"Files in directory: {files}")
     return files
+
 
 check_dir_task = PythonOperator(
     task_id='check_directory',
