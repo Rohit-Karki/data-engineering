@@ -34,9 +34,7 @@ class ZipOperator(BaseOperator):
 
         # Get the path from XCom if not provided
         if not self.path_to_file_to_zip:
-            self.path_to_file_to_zip = context['ti'].xcom_pull(
-                task_ids='wait_for_file', key='file_path')
-
+            self.path_to_file_to_zip = context['ti'].xcom_pull(task_ids='check_directory', key='file_path')        
         print(f"Processing file: {self.path_to_file_to_zip}")
 
         # Generate zip path if not provided
