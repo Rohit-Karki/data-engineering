@@ -107,17 +107,20 @@ upload_to_minio = PythonOperator(
     dag=dag
 )
 
-# send_email = EmailOperator(
-#     task_id='send_email',
-#     to='rohitkarki804@gmail.com',
-#     subject='Zipped and Unzipped File Paths',
-#     html_content="""
-#     <h3>Files Processed Successfully</h3>
-#     <p><strong>Unzipped File Path:</strong> {{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}</p>
-#     <p><strong>Zipped File Path:</strong> {{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}</p>
-#     """,
-#     dag=dag
-# )
-
+send_email = EmailOperator(
+    task_id='send_email',
+    to='rohitkarki804@gmail.com',
+    subject='Zipped and Unzipped File Paths',
+    html_content="""
+    <h3>Files Processed Successfully</h3>
+    <p><strong>Unzipped File Path:</strong> {{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}</p>
+    <p><strong>Zipped File Path:</strong> {{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}</p>
+    """,
+    files=[
+        "{{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}",
+        "{{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}"
+    ],
+    dag=dag
+)
 # Define task dependencies
 check_dir_task >> process_task >> upload_to_minio
