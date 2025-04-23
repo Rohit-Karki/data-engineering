@@ -26,7 +26,8 @@ dag = DAG(
     default_args=default_args,
     description='Monitor folder for files and process them',
     # schedule_interval=timedelta(minutes=1),  # Check every 1 minutes
-    catchup=False,
+    catch
+    up=False,
 )
 
 
