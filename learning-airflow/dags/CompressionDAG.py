@@ -16,7 +16,7 @@ default_args = {
     'start_date': datetime(2025, 4, 16),
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 1,
+    'retries': 0,
     'retry_delay': timedelta(minutes=5),
 }
 
@@ -25,9 +25,8 @@ dag = DAG(
     'file_compression_and_email_workflow',
     default_args=default_args,
     description='Monitor folder for files and process them',
-    # schedule_interval=timedelta(minutes=1),  # Check every 1 minutes
-    catch
-    up=False,
+    schedule_interval=None,  # Check every 1 minutes
+    catchup=False,
 )
 
 
@@ -38,6 +37,10 @@ def check_fileName_in_minio(**kwargs):
     # Get filename from webhook trigger
     filename = kwargs['dag_run'].conf.get('filename')
     print(f"📂 Received filename from conf: {filename}")
+
+    from urllib.parse import quote
+
+    filename = quote(filename)
 
     # MinIO client setup
     client = Minio(
@@ -107,6 +110,30 @@ upload_to_minio = PythonOperator(
     python_callable=upload_zip_to_minio,
     dag=dag
 )
+def prepare_email_content(**kwargs):
+    # Pull file paths from XCom
+    ti = kwargs['ti']
+    unzipped_file_path = ti.xcom_pull(task_ids='check_directory', key='file_path')
+    zipped_file_path = ti.xcom_pull(task_ids='process_task', key='zip_file_path')
+
+    # Calculate file sizes
+    unzipped_file_size = os.path.getsize(unzipped_file_path) if os.path.exists(unzipped_file_path) else 0
+    zipped_file_size = os.path.getsize(zipped_file_path) if os.path.exists(zipped_file_path) else 0
+
+    # Return the email content and file paths
+    return {
+        'unzipped_file_size': unzipped_file_size,
+        'zipped_file_size': zipped_file_size,
+        'unzipped_file_path': unzipped_file_path,
+        'zipped_file_path': zipped_file_path,
+    }
+
+prepare_email_task = PythonOperator(
+    task_id='prepare_email_content',
+    python_callable=prepare_email_content,
+    provide_context=True,
+    dag=dag
+)
 
 send_email = EmailOperator(
     task_id='send_email',
@@ -114,14 +141,41 @@ send_email = EmailOperator(
     subject='Zipped and Unzipped File Paths',
     html_content="""
     <h3>Files Processed Successfully</h3>
-    <p><strong>Unzipped File Path:</strong> {{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}</p>
-    <p><strong>Zipped File Path:</strong> {{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}</p>
+    <p><strong>Unzipped File Size:</strong> {{ ti.xcom_pull(task_ids='prepare_email_content')['unzipped_file_size'] }} bytes</p>
+    <p><strong>Zipped File Size:</strong> {{ ti.xcom_pull(task_ids='prepare_email_content')['zipped_file_size'] }} bytes</p>
     """,
     files=[
-        "{{ ti.xcom_pull(task_ids='check_directory', key='file_path') }}",
-        "{{ ti.xcom_pull(task_ids='process_task', key='zip_file_path') }}"
+        "{{ ti.xcom_pull(task_ids='prepare_email_content')['unzipped_file_path'] }}",
+        "{{ ti.xcom_pull(task_ids='prepare_email_content')['zipped_file_path'] }}"
     ],
     dag=dag
 )
+send_email.template_fields = ('files', 'html_content')
+
+def clean_process_files(**kwargs):
+    local_file_path = kwargs['ti'].xcom_pull(
+        task_ids='check_directory', key='file_path')
+    local_zip_path = kwargs['ti'].xcom_pull(
+        task_ids='process_task', key='zip_file_path')
+
+    # Remove the files
+    if os.path.exists(local_file_path):
+        os.remove(local_file_path)
+        print(f"✅ Removed file: {local_file_path}")
+    else:
+        print(f"❌ File not found: {local_file_path}")
+
+    if os.path.exists(local_zip_path):
+        os.remove(local_zip_path)
+        print(f"✅ Removed file: {local_zip_path}")
+    else:
+        print(f"❌ File not found: {local_zip_path}")
+
+clean_process_task = PythonOperator(
+    task_id='clean_process_task',
+    python_callable=clean_process_files,
+    dag=dag
+)
+
 # Define task dependencies
-check_dir_task >> process_task >> upload_to_minio
+check_dir_task >> process_task >> prepare_email_task >> upload_to_minio >> send_email >> clean_process_task
