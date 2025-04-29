@@ -1,0 +1,10 @@
+[project]
+name = "dataquality-testing"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "great-expectations>=0.18.22",
+    "pandas>=2.2.3",
+]
